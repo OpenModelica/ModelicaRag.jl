@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
 
 jobs:
@@ -36,7 +36,7 @@ jobs:
 
       - name: Build native dependencies
         run: |
-          which unzip || apt-get install -y --no-install-recommends unzip
+          which unzip || sudo apt-get install -y --no-install-recommends unzip
           JULIA_VER=$(julia -e 'print(VERSION.major, ".", VERSION.minor)')
           PKG_SRC=$(julia --project -e 'print(Base.locate_package(Base.identify_package("OMParser")))')
           PKG_ROOT=$(dirname $(dirname "$PKG_SRC"))
