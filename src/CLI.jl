@@ -7,6 +7,7 @@ using ..MCP
 using TOML
 using HTTP
 using JSON3
+using SQLite
 
 export main, index_lib
 
