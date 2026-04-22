@@ -5,10 +5,20 @@ using SQLite.DBInterface: execute
 using LinearAlgebra
 
 export open_store, clear_store, insert_chunk, insert_chunks_batch, search_chunks,
-       lookup_symbol, fuzzy_lookup, chunk_count, get_indexed_mtimes, set_file_mtime, delete_file_chunks
+       insert_symbol, lookup_symbol, fuzzy_lookup, chunk_count, get_indexed_mtimes,
+       set_file_mtime, delete_file_chunks
 
 const SCHEMA = """
 CREATE TABLE IF NOT EXISTS chunks (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    file_path   TEXT    NOT NULL,
+    start_line  INTEGER NOT NULL,
+    end_line    INTEGER NOT NULL,
+    symbol_name TEXT    NOT NULL,
+    symbol_type TEXT    NOT NULL,
+    content     TEXT    NOT NULL
+);
+CREATE TABLE IF NOT EXISTS symbols (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     file_path   TEXT    NOT NULL,
     start_line  INTEGER NOT NULL,
@@ -27,6 +37,8 @@ CREATE TABLE IF NOT EXISTS file_meta (
 );
 CREATE INDEX IF NOT EXISTS idx_symbol    ON chunks(symbol_name COLLATE NOCASE);
 CREATE INDEX IF NOT EXISTS idx_file_path ON chunks(file_path);
+CREATE INDEX IF NOT EXISTS idx_symbols_exact ON symbols(symbol_name COLLATE NOCASE);
+CREATE INDEX IF NOT EXISTS idx_symbols_file ON symbols(file_path);
 """
 
 struct ChunkRecord
@@ -58,8 +70,9 @@ end
 function clear_store(db::SQLite.DB)
     SQLite.execute(db, "DELETE FROM embeddings")
     SQLite.execute(db, "DELETE FROM chunks")
+    SQLite.execute(db, "DELETE FROM symbols")
     SQLite.execute(db, "DELETE FROM file_meta")
-    SQLite.execute(db, "DELETE FROM sqlite_sequence WHERE name IN ('chunks')")
+    SQLite.execute(db, "DELETE FROM sqlite_sequence WHERE name IN ('chunks', 'symbols')")
 end
 
 function get_indexed_mtimes(db::SQLite.DB)::Dict{String, Float64}
@@ -75,7 +88,15 @@ end
 
 function delete_file_chunks(db::SQLite.DB, path::String)
     execute(db, "DELETE FROM chunks WHERE file_path = ?", (path,))
+    execute(db, "DELETE FROM symbols WHERE file_path = ?", (path,))
     execute(db, "DELETE FROM file_meta WHERE file_path = ?", (path,))
+end
+
+function insert_symbol(db::SQLite.DB, chunk)
+    execute(db,
+        "INSERT INTO symbols(file_path,start_line,end_line,symbol_name,symbol_type,content) VALUES(?,?,?,?,?,?)",
+        (chunk.file_path, chunk.start_line, chunk.end_line,
+         chunk.symbol_name, chunk.symbol_type, chunk.content))
 end
 
 function insert_chunk(db::SQLite.DB, chunk, vec::Vector{Float32})
@@ -129,9 +150,24 @@ end
 function lookup_symbol(db::SQLite.DB, name::String)::Vector{ChunkRecord}
     rows = execute(db, """
         SELECT id, file_path, start_line, end_line, symbol_name, symbol_type, content
-        FROM chunks
-        WHERE symbol_name = ? COLLATE NOCASE
-    """, (name,))
+        FROM (
+            SELECT id, file_path, start_line, end_line, symbol_name, symbol_type, content
+            FROM symbols
+            WHERE symbol_name = ? COLLATE NOCASE
+            UNION ALL
+            SELECT c.id, c.file_path, c.start_line, c.end_line,
+                   c.symbol_name, c.symbol_type, c.content
+            FROM chunks c
+            WHERE c.symbol_name = ? COLLATE NOCASE
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM symbols s
+                  WHERE lower(s.symbol_name) = lower(c.symbol_name)
+                    AND s.file_path = c.file_path
+              )
+        )
+        ORDER BY file_path, start_line
+    """, (name, name))
     [ChunkRecord(row.id, row.file_path, row.start_line, row.end_line,
                  row.symbol_name, row.symbol_type, row.content)
      for row in rows]
@@ -141,11 +177,25 @@ function fuzzy_lookup(db::SQLite.DB, pattern::String, top_k::Int = 10)::Vector{C
     like_pattern = "%" * replace(pattern, "%" => "\\%", "_" => "\\_") * "%"
     rows = execute(db, """
         SELECT id, file_path, start_line, end_line, symbol_name, symbol_type, content
-        FROM chunks
-        WHERE symbol_name LIKE ? ESCAPE '\\'
-        ORDER BY symbol_name COLLATE NOCASE
+        FROM (
+            SELECT id, file_path, start_line, end_line, symbol_name, symbol_type, content
+            FROM symbols
+            WHERE symbol_name LIKE ? ESCAPE '\\'
+            UNION ALL
+            SELECT c.id, c.file_path, c.start_line, c.end_line,
+                   c.symbol_name, c.symbol_type, c.content
+            FROM chunks c
+            WHERE c.symbol_name LIKE ? ESCAPE '\\'
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM symbols s
+                  WHERE lower(s.symbol_name) = lower(c.symbol_name)
+                    AND s.file_path = c.file_path
+              )
+        )
+        ORDER BY symbol_name COLLATE NOCASE, file_path, start_line
         LIMIT ?
-    """, (like_pattern, top_k))
+    """, (like_pattern, like_pattern, top_k))
     [ChunkRecord(row.id, row.file_path, row.start_line, row.end_line,
                  row.symbol_name, row.symbol_type, row.content)
      for row in rows]

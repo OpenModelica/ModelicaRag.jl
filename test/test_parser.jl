@@ -52,8 +52,45 @@ end
     @test chunks[1].symbol_type == "model"
 end
 
+@testset "Parser — search_subchunks preserves line spans" begin
+    lines = String[]
+    push!(lines, "model LongModel")
+    for i in 1:70
+        i % 15 == 0 && push!(lines, "")
+        i % 20 == 0 && push!(lines, "equation")
+        push!(lines, "  Real x$i = $i;")
+    end
+    push!(lines, "end LongModel;")
+
+    chunk = Parser.Chunk(
+        "synthetic.mo",
+        20,
+        20 + length(lines) - 1,
+        "Pkg.LongModel",
+        "model",
+        join(lines, "\n"),
+    )
+    parts = Parser.search_subchunks(chunk; target_lines = 18, overlap_lines = 4, min_lines = 6)
+
+    @test length(parts) > 1
+    @test first(parts).start_line == chunk.start_line
+    @test last(parts).end_line == chunk.end_line
+    @test all(p.symbol_name == chunk.symbol_name for p in parts)
+    @test all(p.symbol_type == chunk.symbol_type for p in parts)
+    @test all(chunk.start_line <= p.start_line <= p.end_line <= chunk.end_line for p in parts)
+
+    original_lines = split(chunk.content, '\n')
+    for part in parts
+        rel_lo = part.start_line - chunk.start_line + 1
+        rel_hi = part.end_line - chunk.start_line + 1
+        @test part.content == join(original_lines[rel_lo:rel_hi], "\n")
+    end
+
+    @test any(parts[i + 1].start_line <= parts[i].end_line for i in 1:(length(parts) - 1))
+end
+
 @testset "Parser — msl.mo (Modelica Standard Library)" begin
-    path   = joinpath(FIXTURE_DIR, "msl.mo")
+    path   = joinpath(dirname(@__DIR__), "Models", "msl.mo")
     chunks = Parser.parse_file(path)
     names  = [c.symbol_name for c in chunks]
     types  = [c.symbol_type for c in chunks]

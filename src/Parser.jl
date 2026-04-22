@@ -15,6 +15,11 @@ struct Chunk
     content::String      # raw Modelica source lines
 end
 
+const SEARCH_CHUNK_TARGET_LINES  = 48
+const SEARCH_CHUNK_OVERLAP_LINES = 8
+const SEARCH_CHUNK_MIN_LINES     = 12
+const SPLIT_BOUNDARY_RE = r"^\s*(?:equation|initial\s+equation|algorithm|initial\s+algorithm|annotation|public|protected)\b"
+
 # Maps an Absyn.Path to a dot-separated string.
 function absyn_path_to_string(p)::String
     @match p begin
@@ -74,6 +79,76 @@ function collect_nested_classes(cls)
     end
 
     result
+end
+
+function is_split_boundary(line::AbstractString)::Bool
+    stripped = strip(line)
+    isempty(stripped) && return true
+    occursin(SPLIT_BOUNDARY_RE, stripped)
+end
+
+function choose_split_end(lines::AbstractVector{<:AbstractString}, start_idx::Int, target_end::Int,
+                          min_end::Int, lookaround::Int)::Int
+    n = length(lines)
+    hi = min(n, target_end + lookaround)
+    lo = max(min_end, target_end - lookaround)
+
+    for idx in target_end:hi
+        is_split_boundary(lines[idx]) && return idx
+    end
+    for idx in target_end:-1:lo
+        is_split_boundary(lines[idx]) && return idx
+    end
+
+    target_end
+end
+
+function search_subchunks(chunk::Chunk;
+                          target_lines::Int = SEARCH_CHUNK_TARGET_LINES,
+                          overlap_lines::Int = SEARCH_CHUNK_OVERLAP_LINES,
+                          min_lines::Int = SEARCH_CHUNK_MIN_LINES)::Vector{Chunk}
+    lines = split(chunk.content, '\n')
+    n     = length(lines)
+    n <= target_lines && return [chunk]
+
+    lookaround = max(2, min(target_lines ÷ 3, overlap_lines + 4))
+    pieces     = Chunk[]
+    start_idx  = 1
+
+    while start_idx <= n
+        target_end = min(n, start_idx + target_lines - 1)
+        min_end    = min(n, start_idx + min_lines - 1)
+        stop_idx   = if target_end == n || n - target_end < min_lines
+            n
+        else
+            choose_split_end(lines, start_idx, target_end, min_end, lookaround)
+        end
+
+        stop_idx = clamp(stop_idx, start_idx, n)
+        if stop_idx < n && n - stop_idx < min_lines
+            stop_idx = n
+        end
+
+        content = join(lines[start_idx:stop_idx], "\n")
+        if !isempty(strip(content))
+            push!(pieces, Chunk(
+                chunk.file_path,
+                chunk.start_line + start_idx - 1,
+                chunk.start_line + stop_idx - 1,
+                chunk.symbol_name,
+                chunk.symbol_type,
+                content,
+            ))
+        end
+
+        stop_idx == n && break
+
+        next_start = max(start_idx + 1, stop_idx - overlap_lines + 1)
+        next_start <= start_idx && (next_start = stop_idx + 1)
+        start_idx = next_start
+    end
+
+    isempty(pieces) ? [chunk] : pieces
 end
 
 # Parse a Modelica source file and return a vector of Chunks.

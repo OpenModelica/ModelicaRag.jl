@@ -1,9 +1,10 @@
 {
   "name": "ModelicaRag",
-  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
-  "features": {
-    "ghcr.io/devcontainers/features/julia:1": {
-      "version": "1.12"
+  "build": {
+    "dockerfile": "Dockerfile",
+    "args": {
+      "VARIANT": "ubuntu-24.04",
+      "JULIA_VERSION": "1.12.1"
     }
   },
   "postCreateCommand": "bash .devcontainer/postCreate.sh",

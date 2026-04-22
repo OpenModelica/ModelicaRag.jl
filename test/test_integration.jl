@@ -22,7 +22,7 @@ function llama_server_available(url)
 end
 
 @testset "Integration — parse + store pipeline (synthetic embeddings)" begin
-    path   = joinpath(FIXTURE_DIR, "msl.mo")
+    path   = joinpath(dirname(@__DIR__), "Models", "msl.mo")
     chunks = Parser.parse_file(path)
     @test !isempty(chunks)
 

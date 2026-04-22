@@ -108,6 +108,8 @@ end
 # Index command
 # ---------------------------------------------------------------------------
 
+search_chunk_text(chunk) = "$(chunk.symbol_type) $(chunk.symbol_name)\n$(chunk.content)"
+
 function cmd_index(cfg::Config, db::SQLite.DB, embedder;
                    root::String = cfg.codebase_root, force::Bool = false)
     if force
@@ -163,15 +165,17 @@ function cmd_index(cfg::Config, db::SQLite.DB, embedder;
     for (fi, path) in enumerate(to_index)
         haskey(indexed_mtimes, path) && delete_file_chunks(db, path)
 
-        chunks = parse_file(path)
-        isempty(chunks) && (set_file_mtime(db, path, Float64(stat(path).mtime)); continue)
+        symbols = parse_file(path)
+        isempty(symbols) && (set_file_mtime(db, path, Float64(stat(path).mtime)); continue)
 
-        for chunk in chunks
-            text = "$(chunk.symbol_type) $(chunk.symbol_name)\n$(first(chunk.content, 512))"
-            push!(batch_texts,  text)
-            push!(batch_chunks, chunk)
-            push!(batch_paths,  path)
-            length(batch_chunks) >= cfg.embed_batch_size && flush_batch()
+        for symbol in symbols
+            insert_symbol(db, symbol)
+            for chunk in Parser.search_subchunks(symbol)
+                push!(batch_texts,  search_chunk_text(chunk))
+                push!(batch_chunks, chunk)
+                push!(batch_paths,  path)
+                length(batch_chunks) >= cfg.embed_batch_size && flush_batch()
+            end
         end
 
         if fi % 20 == 0 || fi == length(to_index)

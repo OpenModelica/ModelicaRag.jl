@@ -58,6 +58,26 @@ end
     @test isempty(Store.lookup_symbol(db, "Capacitor"))
 end
 
+@testset "Store — symbols shadow search chunks for exact and fuzzy lookup" begin
+    db  = Store.open_store(tempname() * ".db")
+    vec = Float32[1.0, 0.0, 0.0]
+
+    symbol = fake_chunk("Resistor"; line = 10, content = "model Resistor\n  parameter Real R = 1;\nend Resistor;")
+    Store.insert_symbol(db, symbol)
+    Store.insert_chunk(db, fake_chunk("Resistor"; line = 10, content = "model Resistor"), vec)
+    Store.insert_chunk(db, fake_chunk("Resistor"; line = 11, content = "  parameter Real R = 1;"), vec)
+
+    exact_hits = Store.lookup_symbol(db, "Resistor")
+    @test length(exact_hits) == 1
+    @test exact_hits[1].start_line == 10
+    @test exact_hits[1].end_line == 15
+    @test exact_hits[1].content == symbol.content
+
+    fuzzy_hits = Store.fuzzy_lookup(db, "sist", 10)
+    @test length(fuzzy_hits) == 1
+    @test fuzzy_hits[1].content == symbol.content
+end
+
 @testset "Store — mtime tracking" begin
     db = Store.open_store(tempname() * ".db")
 
@@ -79,6 +99,8 @@ end
 
     Store.insert_chunk(db, fake_chunk("M1"; file = "keep.mo"), vec)
     Store.insert_chunk(db, fake_chunk("M2"; file = "drop.mo"), vec)
+    Store.insert_symbol(db, fake_chunk("M1"; file = "keep.mo"))
+    Store.insert_symbol(db, fake_chunk("M2"; file = "drop.mo"))
     Store.set_file_mtime(db, "keep.mo", 1.0)
     Store.set_file_mtime(db, "drop.mo", 2.0)
 
@@ -90,6 +112,8 @@ end
 
     results = Store.search_chunks(db, vec, 5)
     @test all(r.chunk.symbol_name != "M2" for r in results)
+    @test isempty(Store.lookup_symbol(db, "M2"))
+    @test length(Store.lookup_symbol(db, "M1")) == 1
 end
 
 @testset "Store — clear_store empties everything" begin

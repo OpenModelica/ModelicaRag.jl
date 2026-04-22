@@ -4,9 +4,9 @@ Semantic search over Modelica libraries via a local RAG (Retrieval-Augmented Gen
 
 ## How it works
 
-1. **Parse** — `OMParser.jl` parses each `.mo` file into an Absyn AST. The walker extracts every non-package class (model, function, record, block, connector, type, ...) as a chunk with its fully qualified name (e.g. `Modelica.Electrical.Analog.Basic.Resistor`) and source lines.
-2. **Embed** — chunks are sent to an embedding backend (GitHub Models, Ollama, or llama-server). Only files that changed since the last run are re-indexed.
-3. **Store** — embeddings are stored as binary blobs in SQLite alongside chunk metadata. Cosine similarity search is computed in Julia at query time.
+1. **Parse** — `OMParser.jl` parses each `.mo` file into an Absyn AST. The walker extracts every non-package class (model, function, record, block, connector, type, ...) as a full symbol record with its fully qualified name (e.g. `Modelica.Electrical.Analog.Basic.Resistor`) and source lines.
+2. **Embed** — each full symbol is split into smaller line-bounded search subchunks before embedding. Only files that changed since the last run are re-indexed.
+3. **Store** — SQLite keeps both the full symbol records for exact lookups and the embedded search subchunks for semantic retrieval. Cosine similarity search is computed in Julia at query time.
 4. **Serve** — an MCP stdio server exposes three tools: `search_codebase`, `lookup_symbol`, and `rebuild_index`.
 
 ## Requirements
@@ -119,9 +119,11 @@ julia --project playground.jl /usr/share/openmodelica/libraries/Modelica\ 4.0.0
 
 The playground writes its own index to `data/playground.db` (separate from the main index). Subsequent runs are incremental — only changed files are re-embedded, so re-runs are fast. The four semantic searches use four API requests from the free tier (150/day).
 
+If the full Modelica Standard Library is not installed locally, the playground falls back to the repo-local parser fixture in `Models/msl.mo`. The corresponding upstream MSL license is included in `Models/LICENSE`.
+
 **No local installation needed — try it in a Codespace:**
 
-Click "Code > Open with Codespaces" on the repository page. The devcontainer installs Julia, clones the Modelica Standard Library into `data/msl/`, and runs `Pkg.instantiate()` automatically. `GITHUB_TOKEN` is provided by Codespaces, so the playground works with no extra configuration:
+Click "Code > Open with Codespaces" on the repository page. The devcontainer builds a custom image that installs Julia into the container, clones the Modelica Standard Library into `data/msl/`, and runs `Pkg.instantiate()` automatically. `GITHUB_TOKEN` is provided by Codespaces, so the playground works with no extra configuration:
 
 ```bash
 julia --project playground.jl

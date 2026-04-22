@@ -57,6 +57,10 @@ function find_msl()
     devcontainer_path = joinpath(PROJECT_DIR, "data", "msl", "Modelica")
     isdir(devcontainer_path) && return devcontainer_path
 
+    # Repo-local parser fixture: enough to exercise the playground offline.
+    models_path = joinpath(PROJECT_DIR, "Models")
+    isfile(joinpath(models_path, "msl.mo")) && return models_path
+
     # Local OpenModelica installations.
     for root in [get(ENV, "OPENMODELICAHOME", ""),
                  "/usr/share/openmodelica/libraries",
@@ -113,6 +117,9 @@ end
 
 println("Indexing library (incremental — only changed files are re-embedded).")
 println("First run uses API requests proportional to the number of .mo files.")
+if msl_path == joinpath(PROJECT_DIR, "Models")
+    println("Using the repo-local MSL parser fixture in ./Models.")
+end
 println()
 
 ModelicaRag.main(["index", "--config", config_path])
