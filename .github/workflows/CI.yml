@@ -35,17 +35,7 @@ jobs:
         run: julia --project -e 'import Pkg; Pkg.instantiate()'
 
       - name: Build native dependencies
-        run: |
-          which unzip || sudo apt-get install -y --no-install-recommends unzip
-          JULIA_VER=$(julia -e 'print(VERSION.major, ".", VERSION.minor)')
-          PKG_SRC=$(julia --project -e 'print(Base.locate_package(Base.identify_package("OMParser")))')
-          PKG_ROOT=$(dirname $(dirname "$PKG_SRC"))
-          LIB_DIR="$PKG_ROOT/lib/ubuntu"
-          mkdir -p "$LIB_DIR"
-          URL="https://github.com/OpenModelica/OMParser.jl/releases/download/Latest-ubuntu-latest-julia-${JULIA_VER}/parser-library-ubuntu-latest-julia-${JULIA_VER}.zip"
-          curl -fsSL "$URL" -o /tmp/omparser.zip
-          unzip -o /tmp/omparser.zip -d "$LIB_DIR"
-          rm /tmp/omparser.zip
+        run: julia --project -e 'import Pkg; Pkg.build("OMParser")'
 
       - name: Run tests
         run: julia --project -e 'import Pkg; Pkg.test()'

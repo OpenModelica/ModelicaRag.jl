@@ -3,26 +3,27 @@ uuid = "a2b3c4d5-e6f7-8901-bcde-f01234567890"
 version = "0.1.0"
 
 [deps]
-Absyn         = "ce2f92e2-a952-11e9-0543-8b443f216f1d"
-HTTP          = "cd3eb016-35fb-5094-929b-558a96fad6f3"
-JSON3         = "0f8b85d8-7281-11e9-16c2-39a750bddbf1"
+Absyn = "ce2f92e2-a952-11e9-0543-8b443f216f1d"
+HTTP = "cd3eb016-35fb-5094-929b-558a96fad6f3"
+JSON3 = "0f8b85d8-7281-11e9-16c2-39a750bddbf1"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
-Logging       = "56ddb016-857b-54e1-b83d-db4d58db5568"
-MetaModelica  = "9d7f2a79-07b5-5542-8b19-c0100dda6b06"
-OMParser      = "11f87224-cae7-4e99-a924-e50d12f62c59"
-SQLite        = "0aa819cd-b072-5ff4-a722-6bc24af294d9"
-TOML          = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
-
-[compat]
-HTTP   = "1"
-JSON3  = "1"
-SQLite = "1"
-julia  = "1.12"
+Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"
+MetaModelica = "9d7f2a79-07b5-5542-8b19-c0100dda6b06"
+OMParser = "11f87224-cae7-4e99-a924-e50d12f62c59"
+SQLite = "0aa819cd-b072-5ff4-a722-6bc24af294d9"
+TOML = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
 
 [sources]
-Absyn       = {url = "https://github.com/OpenModelica/Absyn.jl"}
+Absyn = {url = "https://github.com/OpenModelica/Absyn.jl"}
 MetaModelica = {url = "https://github.com/OpenModelica/MetaModelica.jl"}
-OMParser    = {url = "https://github.com/OpenModelica/OMParser.jl"}
+OMParser = {rev = "550b20beae60f226be6afa2b9c02005c7bb20618", url = "https://github.com/OpenModelica/OMParser.jl"}
+
+[compat]
+HTTP = "1"
+JSON3 = "1"
+OMParser = "0.0.5"
+SQLite = "1"
+julia = "1.12"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
