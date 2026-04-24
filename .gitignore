@@ -18,6 +18,9 @@ config.toml
 # Generated data / index database
 /data/
 
+# Compiled app bundle produced by `make build`
+/build/
+
 # Cloned dependency repos (legacy, no longer used)
 /deps/repos/
 
