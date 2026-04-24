@@ -19,6 +19,7 @@ build:
 	julia --project=. scripts/build_modelicarag.jl
 
 install: build
+	@test -n "$(PREFIX)" || { echo "PREFIX must not be empty"; exit 1; }
 	install -d "$(BINDIR)"
 	rm -rf "$(LIBDIR)"
 	install -d "$(LIBDIR)"
@@ -29,6 +30,7 @@ install: build
 	chmod 755 "$(INSTALLED_WRAPPER)"
 
 uninstall:
+	@test -n "$(PREFIX)" || { echo "PREFIX must not be empty"; exit 1; }
 	rm -f "$(INSTALLED_WRAPPER)"
 	rm -rf "$(LIBDIR)"
 

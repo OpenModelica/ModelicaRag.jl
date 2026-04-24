@@ -1,0 +1,63 @@
+name: Build app
+
+on:
+  push:
+    branches: [master]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build app / Julia ${{ matrix.julia-version }} / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        julia-version: ["1.12"]
+        os: [ubuntu-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: ${{ matrix.julia-version }}
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.julia/packages
+            ~/.julia/compiled
+            ~/.julia/artifacts
+          key: ${{ runner.os }}-julia-${{ matrix.julia-version }}-app-${{ hashFiles('Project.toml', 'scripts/build_modelicarag.jl') }}
+          restore-keys: |
+            ${{ runner.os }}-julia-${{ matrix.julia-version }}-app-
+
+      - name: Instantiate project
+        run: julia --project -e 'import Pkg; Pkg.instantiate()'
+
+      - name: Build native dependencies
+        run: julia --project -e 'import Pkg; Pkg.build("OMParser")'
+
+      - name: Build app
+        run: make build
+
+      - name: Verify build outputs
+        run: |
+          test -x build/modelicarag
+          test -x build/modelicarag-app/bin/modelicarag
+          file build/modelicarag-app/bin/modelicarag
+
+      - name: Package tarball
+        run: |
+          cd build
+          tar czf "modelicarag-${{ runner.os }}.tar.gz" modelicarag modelicarag-app
+          ls -lh "modelicarag-${{ runner.os }}.tar.gz"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: modelicarag-${{ runner.os }}-julia${{ matrix.julia-version }}
+          path: build/modelicarag-*.tar.gz
+          if-no-files-found: error
+          retention-days: 14
