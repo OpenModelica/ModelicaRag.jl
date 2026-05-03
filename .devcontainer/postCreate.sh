@@ -21,10 +21,12 @@ echo ""
 echo "Registering Julia registries (General + OpenModelicaRegistry)..."
 julia --project -e '
 using Pkg
-existing = Set(r.name for r in Pkg.Registry.reachable_registries())
-"General" in existing || Pkg.Registry.add("General")
-"OpenModelicaRegistry" in existing ||
-    Pkg.Registry.add(Pkg.RegistrySpec(url = "https://github.com/OpenModelica/OpenModelicaRegistry.git"))
+const OMR_URL = "https://github.com/OpenModelica/OpenModelicaRegistry.git"
+existing = Pkg.Registry.reachable_registries()
+has_general = any(r -> r.name == "General", existing)
+has_omr = any(r -> occursin("OpenModelicaRegistry", something(r.repo, "")), existing)
+has_general || Pkg.Registry.add("General")
+has_omr || Pkg.Registry.add(Pkg.RegistrySpec(url = OMR_URL))
 '
 
 echo ""
