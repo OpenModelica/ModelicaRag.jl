@@ -31,11 +31,20 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-julia-${{ matrix.julia-version }}-
 
+      - name: Add Julia registries
+        run: |
+          julia --startup-file=no --project -e '
+            import Pkg
+            regs = Dict(r.name => r for r in Pkg.Registry.reachable_registries())
+            haskey(regs, "General") || Pkg.Registry.add(Pkg.RegistrySpec(url="https://github.com/JuliaRegistries/General.git"))
+            haskey(regs, "OpenModelica") || Pkg.Registry.add(Pkg.RegistrySpec(url="https://github.com/OpenModelica/OpenModelicaRegistry.git"))
+          '
+
       - name: Instantiate
-        run: julia --project -e 'import Pkg; Pkg.instantiate()'
+        run: julia --startup-file=no --project -e 'import Pkg; Pkg.instantiate()'
 
       - name: Build native dependencies
-        run: julia --project -e 'import Pkg; Pkg.build("OMParser")'
+        run: julia --startup-file=no --project -e 'import Pkg; Pkg.build("OMParser")'
 
       - name: Run tests
-        run: julia --project -e 'import Pkg; Pkg.test()'
+        run: julia --startup-file=no --project -e 'import Pkg; Pkg.test()'
